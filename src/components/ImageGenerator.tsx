@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 
 interface ImageSize {
@@ -14,10 +14,46 @@ export default function ImageGenerator() {
   const [taskId, setTaskId] = useState<string | null>(null)
   const [images, setImages] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
+
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null
+
+    if (taskId && !images.length) {
+      setGenerating(true)
+      pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${taskId}`)
+          const data = await response.json()
+          if (data.status === 'completed') {
+            setImages(data.images)
+            setGenerating(false)
+            setTaskId(null)
+            if (pollInterval) clearInterval(pollInterval)
+          } else if (data.status === 'failed') {
+            console.error('Image generation failed')
+            setGenerating(false)
+            setTaskId(null)
+            if (pollInterval) clearInterval(pollInterval)
+          }
+        } catch (error) {
+          console.error('Error polling status:', error)
+          setGenerating(false)
+          setTaskId(null)
+          if (pollInterval) clearInterval(pollInterval)
+        }
+      }, 2000)
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval)
+    }
+  }, [taskId, images])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setImages([])
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/generate`, {
         method: 'POST',
@@ -32,31 +68,11 @@ export default function ImageGenerator() {
       })
       const data = await response.json()
       setTaskId(data.taskId)
-      startPolling(data.taskId)
     } catch (error) {
       console.error('Error generating image:', error)
     } finally {
       setLoading(false)
     }
-  }
-
-  const startPolling = (taskId: string) => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${taskId}`)
-        const data = await response.json()
-        if (data.status === 'completed') {
-          setImages(data.images)
-          clearInterval(pollInterval)
-        } else if (data.status === 'failed') {
-          console.error('Image generation failed')
-          clearInterval(pollInterval)
-        }
-      } catch (error) {
-        console.error('Error polling status:', error)
-        clearInterval(pollInterval)
-      }
-    }, 2000)
   }
 
   return (
@@ -74,6 +90,7 @@ export default function ImageGenerator() {
             rows={3}
             placeholder="Describe the image you want to generate..."
             required
+            disabled={loading || generating}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -91,6 +108,7 @@ export default function ImageGenerator() {
               max="1024"
               step="64"
               required
+              disabled={loading || generating}
             />
           </div>
           <div>
@@ -107,13 +125,21 @@ export default function ImageGenerator() {
               max="1024"
               step="64"
               required
+              disabled={loading || generating}
             />
           </div>
         </div>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Generating...' : 'Generate Image'}
+        <Button type="submit" disabled={loading || generating}>
+          {loading ? 'Submitting...' : generating ? 'Generating...' : 'Generate Image'}
         </Button>
       </form>
+
+      {generating && (
+        <div className="mt-8 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
+          <p className="mt-2 text-sm text-muted-foreground">正在生成图片，请稍候...</p>
+        </div>
+      )}
 
       {images.length > 0 && (
         <div className="mt-8">

@@ -1,11 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from './ui/button'
 
 interface ImageSize {
   width: number
   height: number
+}
+
+interface ImageResponse {
+  success: boolean
+  status: string
+  data: Array<{
+    url: string
+  }>
 }
 
 export default function ImageGenerator() {
@@ -15,38 +23,53 @@ export default function ImageGenerator() {
   const [images, setImages] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const pollCountRef = useRef(0)
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null
 
     if (taskId && !images.length) {
       setGenerating(true)
-      pollInterval = setInterval(async () => {
-        try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${taskId}`)
-          const data = await response.json()
-          if (data.status === 'completed') {
-            setImages(data.images)
+      pollCountRef.current = 0
+      
+      const startPolling = () => {
+        pollCountRef.current += 1
+        const delay = pollCountRef.current * 1000 // 1s, 2s, 3s, 4s
+
+        pollInterval = setTimeout(async () => {
+          try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${taskId}`)
+            const data: ImageResponse = await response.json()
+            if (data.status === 'completed' && data.success && Array.isArray(data.data)) {
+              setImages(data.data.map(item => item.url))
+              setGenerating(false)
+              setTaskId(null)
+            } else if (data.status === 'failed') {
+              console.error('Image generation failed')
+              setGenerating(false)
+              setTaskId(null)
+            } else if (pollCountRef.current < 5) {
+              // 如果还没到最大轮询次数，继续轮询
+              startPolling()
+            } else {
+              // 达到最大轮询次数，停止轮询
+              setGenerating(false)
+              setTaskId(null)
+              alert('图片生成超时，请重试')
+            }
+          } catch (error) {
+            console.error('Error polling status:', error)
             setGenerating(false)
             setTaskId(null)
-            if (pollInterval) clearInterval(pollInterval)
-          } else if (data.status === 'failed') {
-            console.error('Image generation failed')
-            setGenerating(false)
-            setTaskId(null)
-            if (pollInterval) clearInterval(pollInterval)
           }
-        } catch (error) {
-          console.error('Error polling status:', error)
-          setGenerating(false)
-          setTaskId(null)
-          if (pollInterval) clearInterval(pollInterval)
-        }
-      }, 2000)
+        }, delay)
+      }
+
+      startPolling()
     }
 
     return () => {
-      if (pollInterval) clearInterval(pollInterval)
+      if (pollInterval) clearTimeout(pollInterval)
     }
   }, [taskId, images])
 
@@ -67,9 +90,14 @@ export default function ImageGenerator() {
         }),
       })
       const data = await response.json()
-      setTaskId(data.taskId)
+      if (data.taskId) {
+        setTaskId(data.taskId)
+      } else {
+        throw new Error('No task ID received')
+      }
     } catch (error) {
       console.error('Error generating image:', error)
+      alert('生成图片失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -141,7 +169,7 @@ export default function ImageGenerator() {
         </div>
       )}
 
-      {images.length > 0 && (
+      {images && images.length > 0 && (
         <div className="mt-8">
           <h2 className="text-lg font-semibold">Generated Images</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">

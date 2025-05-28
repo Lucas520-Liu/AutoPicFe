@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from './ui/button'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from 'next/navigation'
 
 interface ImageSize {
   width: number
@@ -24,6 +26,8 @@ export default function ImageGenerator() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const pollCountRef = useRef(0)
+  const router = useRouter()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null
@@ -75,6 +79,14 @@ export default function ImageGenerator() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // 检查登录状态
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login')
+      return
+    }
+
     setLoading(true)
     setImages([])
     try {
@@ -82,6 +94,7 @@ export default function ImageGenerator() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           prompt,

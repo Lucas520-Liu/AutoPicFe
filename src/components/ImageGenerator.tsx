@@ -36,13 +36,26 @@ export default function ImageGenerator() {
       setGenerating(true)
       pollCountRef.current = 0
       
-      const startPolling = () => {
+      const startPolling = async () => {
         pollCountRef.current += 1
         const delay = pollCountRef.current * 1000 // 1s, 2s, 3s, 4s
 
         pollInterval = setTimeout(async () => {
           try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${taskId}`)
+            // 获取当前会话用于认证
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) {
+              setGenerating(false)
+              setTaskId(null)
+              router.push('/login')
+              return
+            }
+
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${taskId}`, {
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+              }
+            })
             const data: ImageResponse = await response.json()
             if (data.status === 'completed' && data.success && Array.isArray(data.data)) {
               setImages(data.data.map(item => item.url))
@@ -75,7 +88,7 @@ export default function ImageGenerator() {
     return () => {
       if (pollInterval) clearTimeout(pollInterval)
     }
-  }, [taskId, images])
+  }, [taskId, images, router, supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

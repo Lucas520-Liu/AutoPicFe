@@ -13,7 +13,7 @@ interface ApiResponse {
 }
 
 function UserRegisterForm() {
-  const [nickname, setNickname] = useState('')
+  const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
   const [exchanging, setExchanging] = useState(true)
   const [error, setError] = useState('')
@@ -75,8 +75,8 @@ function UserRegisterForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!nickname.trim()) {
-      setError('请输入昵称')
+    if (!username.trim()) {
+      setError('请输入用户名')
       return
     }
 
@@ -99,7 +99,7 @@ function UserRegisterForm() {
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          nickname: nickname.trim(),
+          username: username.trim(),
         }),
       })
 
@@ -131,7 +131,7 @@ function UserRegisterForm() {
     )
   }
 
-  if (error && !nickname) {
+  if (error && !username) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="w-full max-w-md space-y-8 rounded-lg bg-card p-8 shadow-lg text-center">
@@ -151,24 +151,24 @@ function UserRegisterForm() {
         <div>
           <h2 className="text-center text-3xl font-bold">完成注册</h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
-            请设置您的昵称完成注册
+            请设置您的用户名完成注册
           </p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label htmlFor="nickname" className="block text-sm font-medium mb-2">
-              昵称
+            <label htmlFor="username" className="block text-sm font-medium mb-2">
+              用户名
             </label>
             <input
-              id="nickname"
-              name="nickname"
+              id="username"
+              name="username"
               type="text"
               required
               className="relative block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              placeholder="请输入您的昵称"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              placeholder="请输入您的用户名"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               disabled={loading}
             />
           </div>

@@ -99,7 +99,7 @@ export default function ImageGenerator() {
               if (data.message) {
                 alert(data.message)
               }
-            } else if (pollCountRef.current < 5) {
+            } else if (pollCountRef.current < 10) {
               // 如果还没到最大轮询次数，继续轮询
               startPolling()
             } else {

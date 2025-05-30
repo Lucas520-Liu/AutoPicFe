@@ -16,6 +16,16 @@ interface ImageResponse {
   data: Array<{
     url: string
   }>
+  redirectTo?: string
+  message?: string
+}
+
+interface ApiResponse {
+  success: boolean
+  statusCode?: number
+  message?: string
+  redirectTo?: string
+  taskId?: string
 }
 
 export default function ImageGenerator() {
@@ -28,6 +38,19 @@ export default function ImageGenerator() {
   const pollCountRef = useRef(0)
   const router = useRouter()
   const supabase = createClientComponentClient()
+
+  // 处理API响应的通用函数
+  const handleApiResponse = (data: any) => {
+    if (data.redirectTo) {
+      router.push(data.redirectTo)
+      return false // 表示需要跳转，停止后续处理
+    }
+    if (!data.success && data.message) {
+      alert(data.message)
+      return false
+    }
+    return true // 表示可以继续处理
+  }
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null
@@ -57,6 +80,14 @@ export default function ImageGenerator() {
               }
             })
             const data: ImageResponse = await response.json()
+            
+            // 处理API响应
+            if (!handleApiResponse(data)) {
+              setGenerating(false)
+              setTaskId(null)
+              return
+            }
+
             if (data.status === 'completed' && data.success && Array.isArray(data.data)) {
               setImages(data.data.map(item => item.url))
               setGenerating(false)
@@ -65,6 +96,9 @@ export default function ImageGenerator() {
               console.error('Image generation failed')
               setGenerating(false)
               setTaskId(null)
+              if (data.message) {
+                alert(data.message)
+              }
             } else if (pollCountRef.current < 5) {
               // 如果还没到最大轮询次数，继续轮询
               startPolling()
@@ -115,7 +149,13 @@ export default function ImageGenerator() {
           height: size.height,
         }),
       })
-      const data = await response.json()
+      const data: ApiResponse = await response.json()
+      
+      // 处理API响应
+      if (!handleApiResponse(data)) {
+        return
+      }
+
       if (data.taskId) {
         setTaskId(data.taskId)
       } else {

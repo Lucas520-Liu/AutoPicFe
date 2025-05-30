@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+interface ApiResponse {
+  success: boolean
+  statusCode?: number
+  message?: string
+  redirectTo?: string
+}
+
 function UserRegisterForm() {
   const [nickname, setNickname] = useState('')
   const [loading, setLoading] = useState(false)
@@ -13,6 +20,19 @@ function UserRegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClientComponentClient()
+
+  // 处理API响应的通用函数
+  const handleApiResponse = (data: ApiResponse) => {
+    if (data.redirectTo) {
+      router.push(data.redirectTo)
+      return false // 表示需要跳转，停止后续处理
+    }
+    if (!data.success && data.message) {
+      setError(data.message)
+      return false
+    }
+    return true // 表示可以继续处理
+  }
 
   useEffect(() => {
     const handleAuth = async () => {
@@ -83,9 +103,11 @@ function UserRegisterForm() {
         }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || '注册失败')
+      const data: ApiResponse = await response.json()
+      
+      // 处理API响应
+      if (!handleApiResponse(data)) {
+        return
       }
 
       // 注册成功，跳转到主页

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function UserRegisterPage() {
+function UserRegisterForm() {
   const [nickname, setNickname] = useState('')
   const [loading, setLoading] = useState(false)
   const [exchanging, setExchanging] = useState(true)
@@ -15,27 +15,41 @@ export default function UserRegisterPage() {
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    const exchangeCodeForSession = async () => {
+    const handleAuth = async () => {
       const code = searchParams.get('code')
       
-      if (!code) {
-        setError('缺少验证码，请重新注册')
-        setExchanging(false)
-        return
-      }
-
-      try {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (error) throw error
-        setExchanging(false)
-      } catch (error) {
-        console.error('Error exchanging code for session:', error)
-        setError('验证失败，请重新注册')
-        setExchanging(false)
+      if (code) {
+        // 如果有code参数，用code换取session
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          if (error) throw error
+          setExchanging(false)
+        } catch (error) {
+          console.error('Error exchanging code for session:', error)
+          setError('验证失败，请重新注册')
+          setExchanging(false)
+        }
+      } else {
+        // 如果没有code参数，检查是否已经有有效的session
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            // 已经有有效的session，直接跳过交换过程
+            setExchanging(false)
+          } else {
+            // 既没有code也没有session
+            setError('缺少验证码且未登录，请重新注册')
+            setExchanging(false)
+          }
+        } catch (error) {
+          console.error('Error getting session:', error)
+          setError('获取登录状态失败，请重新注册')
+          setExchanging(false)
+        }
       }
     }
 
-    exchangeCodeForSession()
+    handleAuth()
   }, [searchParams, supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,7 +103,7 @@ export default function UserRegisterPage() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="w-full max-w-md space-y-8 rounded-lg bg-card p-8 shadow-lg text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
-          <p className="text-sm text-muted-foreground">正在验证邮箱...</p>
+          <p className="text-sm text-muted-foreground">正在验证身份...</p>
         </div>
       </div>
     )
@@ -115,7 +129,7 @@ export default function UserRegisterPage() {
         <div>
           <h2 className="text-center text-3xl font-bold">完成注册</h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
-            邮箱验证成功！请设置您的昵称完成注册
+            请设置您的昵称完成注册
           </p>
         </div>
         
@@ -155,5 +169,24 @@ export default function UserRegisterPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="w-full max-w-md space-y-8 rounded-lg bg-card p-8 shadow-lg text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
+        <p className="text-sm text-muted-foreground">加载中...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function UserRegisterPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <UserRegisterForm />
+    </Suspense>
   )
 } 

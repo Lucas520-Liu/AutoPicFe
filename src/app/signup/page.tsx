@@ -26,11 +26,11 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/user/register`,
+          emailRedirectTo: `${window.location.origin}/login`,
         },
       })
       if (error) throw error
-      alert('注册成功！请查收邮件完成验证。')
+      alert('请求成功！请查收邮件完成验证。')
       router.push('/login')
     } catch (error) {
       console.error('Error registering:', error)

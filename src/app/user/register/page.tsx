@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 interface ApiResponse {
   success: boolean
@@ -15,10 +15,9 @@ interface ApiResponse {
 function UserRegisterForm() {
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
-  const [exchanging, setExchanging] = useState(true)
+  const [checking, setChecking] = useState(true)
   const [error, setError] = useState('')
   const router = useRouter()
-  const searchParams = useSearchParams()
   const supabase = createClientComponentClient()
 
   // 处理API响应的通用函数
@@ -35,42 +34,24 @@ function UserRegisterForm() {
   }
 
   useEffect(() => {
-    const handleAuth = async () => {
-      const code = searchParams.get('code')
-      
-      if (code) {
-        // 如果有code参数，用code换取session
-        try {
-          const { error } = await supabase.auth.exchangeCodeForSession(code)
-          if (error) throw error
-          setExchanging(false)
-        } catch (error) {
-          console.error('Error exchanging code for session:', error)
-          setError('验证失败，请重新注册')
-          setExchanging(false)
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          // 有有效的session，可以继续注册流程
+          setChecking(false)
+        } else {
+          // 没有session，跳转到登录页
+          router.push('/login')
         }
-      } else {
-        // 如果没有code参数，检查是否已经有有效的session
-        try {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            // 已经有有效的session，直接跳过交换过程
-            setExchanging(false)
-          } else {
-            // 既没有code也没有session
-            setError('缺少验证码且未登录，请重新注册')
-            setExchanging(false)
-          }
-        } catch (error) {
-          console.error('Error getting session:', error)
-          setError('获取登录状态失败，请重新注册')
-          setExchanging(false)
-        }
+      } catch (error) {
+        console.error('Error getting session:', error)
+        router.push('/login')
       }
     }
 
-    handleAuth()
-  }, [searchParams, supabase])
+    checkAuth()
+  }, [router, supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,7 +68,7 @@ function UserRegisterForm() {
       // 获取当前会话
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        setError('登录状态已过期，请重新注册')
+        router.push('/login')
         return
       }
 
@@ -120,26 +101,12 @@ function UserRegisterForm() {
     }
   }
 
-  if (exchanging) {
+  if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="w-full max-w-md space-y-8 rounded-lg bg-card p-8 shadow-lg text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
-          <p className="text-sm text-muted-foreground">正在验证身份...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error && !username) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="w-full max-w-md space-y-8 rounded-lg bg-card p-8 shadow-lg text-center">
-          <h2 className="text-2xl font-bold text-destructive">验证失败</h2>
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <Button onClick={() => router.push('/signup')} className="w-full">
-            重新注册
-          </Button>
+          <p className="text-sm text-muted-foreground">正在验证登录状态...</p>
         </div>
       </div>
     )

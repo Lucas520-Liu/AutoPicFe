@@ -10,22 +10,38 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const router = useRouter()
   const supabase = createClientComponentClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError('')
+    
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      if (error) throw error
+      
+      if (error) {
+        if (error.message === 'Invalid login credentials') {
+          // 账号未注册，显示提示并跳转到注册页面
+          setError('该账号未注册，即将跳转到注册页面...')
+          setTimeout(() => {
+            router.push('/signup')
+          }, 2000)
+          return
+        }
+        throw error
+      }
+      
       router.push('/')
       router.refresh()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error logging in:', error)
+      setError(error.message || '登录失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -70,6 +86,12 @@ export default function LoginPage() {
               />
             </div>
           </div>
+
+          {error && (
+            <div className="text-center text-sm text-destructive">
+              {error}
+            </div>
+          )}
 
           <div>
             <Button
